@@ -256,6 +256,12 @@ public actor VaultClient {
         return object[name] as? String
     }
 
+    /// Keeps the tokens from a sign-in that finished outside this file (passkey login).
+    func setTokens(access: String, refresh: String?) {
+        accessToken = access
+        refreshToken = refresh
+    }
+
     /// Current bearer token (for the notifications hub).
     public var currentAccessToken: String? { accessToken }
 
@@ -610,7 +616,7 @@ public actor VaultClient {
         return r
     }
 
-    private func post(_ base: URL, _ path: String, formBody: [String: String]) throws(APIError) -> URLRequest {
+    func post(_ base: URL, _ path: String, formBody: [String: String]) throws(APIError) -> URLRequest {
         var r = try request(base, path)
         r.httpMethod = "POST"
         r.setValue("application/x-www-form-urlencoded; charset=utf-8", forHTTPHeaderField: "Content-Type")
@@ -639,7 +645,7 @@ public actor VaultClient {
         return data
     }
 
-    private func send<T: Decodable>(_ request: URLRequest) async throws(APIError) -> T {
+    func send<T: Decodable>(_ request: URLRequest) async throws(APIError) -> T {
         let data: Data
         let response: URLResponse
         do { (data, response) = try await session.data(for: request) } catch {
