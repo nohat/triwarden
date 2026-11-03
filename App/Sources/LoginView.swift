@@ -164,6 +164,14 @@ private struct LoginForm: View {
                         Rectangle().fill(Color.primary.opacity(0.1)).frame(height: 1)
                     }
                     .padding(.vertical, 2)
+                    if model.canLogInWithPasskey {
+                        Button { Task { await model.loginWithPasskey() } } label: {
+                            Label("Log in with a passkey", systemImage: "person.badge.key")
+                        }
+                        .buttonStyle(AppButtonStyle(kind: .secondary, large: true))
+                        .disabled(model.isBusy || model.deviceLogin != nil)
+                        .help(Text("Use a passkey saved for this server. No email or master password needed if the passkey can unlock your vault."))
+                    }
                     Button { askingSSO = true } label: {
                         Label("Log in with single sign-on", systemImage: "building.2")
                     }

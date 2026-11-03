@@ -1430,6 +1430,47 @@ final class AppModel {
         }
     }
 
+    // MARK: Passkey
+
+    /// Whether this build may ask for the entered server's passkeys (its domain is in the app's associated domains).
+    var canLogInWithPasskey: Bool {
+        guard serverKind == .selfHosted, let environment = environment() else { return false }
+        return PasskeySignIn.isAvailable(for: environment)
+    }
+
+    /// Shows the system passkey sheet; no email needed. A passkey with PRF also unlocks the vault. One without it
+    /// signs in only, so the master password unlocks next, the same step as after single sign-on.
+    func loginWithPasskey() async {
+        guard let environment = environment() else {
+            errorMessage = serverURLProblem ?? String(localized: "Enter a valid server URL.")
+            return
+        }
+        isBusy = true
+        errorMessage = nil
+        defer { isBusy = false }
+        let client = makeClient(environment)
+        do {
+            let challenge = try await client.passkeyChallenge()
+            let assertion = try await PasskeySignIn.assert(challenge)
+            let login = try await client.loginWithPasskey(assertion, challenge: challenge)
+            email = login.session.email
+            if let userKey = login.userKey {
+                try await finishLogin(environment: environment, client: client, kdf: login.session.kdf,
+                                      protectedUserKey: login.session.protectedUserKey, userKey: userKey,
+                                      refreshToken: login.session.refreshToken)
+            } else {
+                pendingSSO = (client, login.session, environment)
+                phase = .ssoPassword
+            }
+        } catch PasskeySignIn.Failure.cancelled {
+            // Closed the passkey sheet: stay on the login form.
+        } catch let failure as PasskeySignIn.Failure {
+            errorMessage = failure.errorDescription
+        } catch {
+            handle(error)
+        }
+    }
+
     /// Syncs every unlocked account now.
     func refresh() async throws {
         try await SyncBatch.run(sessions) { try await $0.refresh() }
